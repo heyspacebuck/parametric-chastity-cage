@@ -1,17 +1,24 @@
 // Parametric chastity cage, modified from this one: https://www.thingiverse.com/thing:2764421/
 // August 2018
+// Last update: February 2019
 
 // Render cage and ring separately
-separateParts = true; // [true, false]
+separateParts = 1; // [0: Together, 1: Separate]
 
 // Clip the bottom so the base is flatter when printing
-flattenBase=true; // [true, false]
+flattenBase = 0; // [0: Unclipped, 1: Clipped]
 
 // Base ring diameter
 base_ring_diameter=45; // [30:55]
 
 // Thickness of base ring 
 base_thick_bar_diameter=6; // [6:10]
+
+// EXPERIMENTAL: Add a "wave" to the base ring (contours to the body a little better, reduces chafing)
+wavyBase = 1; // [0: Flat, 1: Wavy]
+
+// EXPERIMENTAL: If the base ring has a wave, set the angle of the wave
+waveAngle = 20; // [0:45]
 
 // Cage diameter
 cage_diameter=40; // [30:40]
@@ -69,7 +76,7 @@ part_distance=0.3;
 // Tilt angle of the cage at the base ring
 tilt=15; // [0:30]
 
-$fn=24;
+$fn=36;
 make();
 
 
@@ -411,29 +418,45 @@ mount_height=18;
 tilt=15;
 
 module base_ring(r, thick_bar) {
-  if (bigBalls) {
-    // Make the bottom part of the two-part base ring
-    rotate([0,0,-75]) torus(r+thick_bar, thick_bar, 210);
-    // Add spheres to round the ends
-    ///////////////////////////////
-    
-    // Make the top part of the two-part base ring
-    a=r+thick_bar;
-    c=a/sin(120)*sin(60-asin(sin(120)*r/a));
-    translate([-c, 0, 0])
-      rotate([0,0,105]) // rotate([0,0,120-(angle-120)/2])
-        torus(r, thick_bar, 150);
-    // Add spheres to round the ends
-    ///////////////////////////////
+  a=r+thick_bar;
+  c=a/sin(120)*sin(60-asin(sin(120)*r/a));
+  if (wavyBase) {
+    wavy_torus(r+thick_bar, thick_bar, waveAngle);
+    translate([-c, 0, a*sin(waveAngle)*sin(45)])
+      rotate([0,-waveAngle,0]) rotate([0,0,120]) {
+        torus(r, thick_bar, 120);
+        translate([r, 0, 0]) sphere(thick_bar);
+        rotate([0,0,120]) translate([r, 0, 0]) sphere(thick_bar);
+      }
   } else {
     torus(r+thick_bar, thick_bar);
-    a=r+thick_bar;
-    c=a/sin(120)*sin(60-asin(sin(120)*r/a));
     translate([-c, 0, 0])
       rotate([0,0,120])
         torus(r, thick_bar, 120);
   }
 }
+
+module wavy_torus(R, r, pitch) {
+  union() {
+    translate([-sin(-45)*R*(1-cos(pitch)), 0, 1-R*sin(-45)*sin(pitch)]) rotate([0, pitch, 0]) rotate([0, 0, -45]) {
+      torus(R, r, 90);
+      translate([R, 0, 0]) sphere(r, center=true);
+    }
+    translate([0, sin(45)*R*(1-cos(pitch)), 1-R*sin(45)*sin(pitch)]) rotate([pitch, 0, 0]) rotate([0, 0, 45]) {
+      torus(R, r, 90);
+      translate([R, 0, 0]) sphere(r, center=true);
+    }
+    translate([-sin(135)*R*(1-cos(pitch)), 0, 1-R*sin(135)*sin(-pitch)]) rotate([0, -pitch, 0]) rotate([0, 0, 135]) {
+      torus(R, r, 90);
+      translate([R, 0, 0]) sphere(r, center=true);
+    }
+    translate([0, sin(-135)*R*(1-cos(pitch)), 1-R*sin(-135)*sin(-pitch)]) rotate([-pitch, 0, 0]) rotate([0, 0, -135]) {
+      torus(R, r, 90);
+      translate([R, 0, 0]) sphere(r, center=true);
+    }
+  }
+}
+
 
 module shield_lock_case(thick_bar) {
   difference() {
