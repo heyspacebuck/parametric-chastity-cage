@@ -1,12 +1,28 @@
+////////////////////////////////////
+//
 // Parametric chastity cage, modified from this one: https://www.thingiverse.com/thing:2764421/
-// August 2018
-// Last update: February 2019
+// Version 3, published August 2018
+
+// V4 update: February 2019
+//    - Added option to bend the base ring, for comfort
+//    - Updated variables for Thingiverse Customizer
+
+// V5 update: June 2019
+//    - Rewrote as many functions as possible
+
+//////////////////////////////////////
 
 // Render cage and ring separately
 separateParts = 1; // [0: Together, 1: Separate]
 
 // Clip the bottom so the base is flatter when printing
 flattenBase = 0; // [0: Unclipped, 1: Clipped]
+
+// Cage diameter
+cage_diameter=40; // [30:40]
+
+// Cage length
+cage_length=80; // [30:200]
 
 // Base ring diameter
 base_ring_diameter=45; // [30:55]
@@ -18,13 +34,7 @@ base_thick_bar_diameter=6; // [6:10]
 wavyBase = 1; // [0: Flat, 1: Wavy]
 
 // EXPERIMENTAL: If the base ring has a wave, set the angle of the wave
-waveAngle = 25; // [0:45]
-
-// Cage diameter
-cage_diameter=40; // [30:40]
-
-// Cage length
-cage_length=100; // [30:200]
+waveAngle = 20; // [0:45]
 
 // Thickness of the rings of the cage
 cage_thick_bar_diameter=4; // [4:8]
@@ -32,10 +42,22 @@ cage_thick_bar_diameter=4; // [4:8]
 // Number of vertical bars on the cage
 cage_bar_count=8;
 
+// Tilt angle of the cage at the base ring
+tilt=15; // [0:30]
+
+// If your lock fits too tightly in the casing, add some space around it here (NOTE: this is computationally taxing, keep it set to 0 until you are really sure you need it)
+lock_margin = 0.5; // [0:0.01:1]
+
+// X-axis coordinate of the bend point (the center of the arc the cage bends around)
+bend_point_x=50; // [0:0.1:200]
+
+// Z-axis coordinate of the bend point (the center of the arc the cage bends around)
+bend_point_z=15; // [0:0.1:200]
+
 /* [Hidden] */
 
 // Glans cage height (minimum is cage radius)
-cage_glans_height=cage_diameter/2; // [15:50]
+glans_cage_height=cage_diameter/2; // [15:50]
 
 // Base ring type: single solid ring, or two-part ring (for folks who can't fit into a solid ring)
 // -- IN PROGRESS --
@@ -60,38 +82,83 @@ lock_twist_length=7;
 wiggle=0.005;
 lc_rounding=0.7;
 
-
 // Variables affecting cage properties
+bend_point_y=0;
 thin_bar_diameter=4;
 thin_bar=thin_bar_diameter/2;
 mount_width=4;
-bend_point_x=50;
-bend_point_z=35;
-
-// I have no idea what these do --spacebuck
-mount_length=24.505; 
 mount_height=18;
+mount_length=21.505;
 part_distance=0.3;
+rounding=1;
+gap=10;
 
-// Tilt angle of the cage at the base ring
-tilt=15; // [0:30]
+// Square function for math
+function sq(x) = pow(x, 2);
 
-$fn=36;
+
+////////////////////////////////////
+//
+// Useful values calculated from parameters above
+//
+
+// step: angle between cage bars
+step = 360/cage_bar_count;
+
+// R1: Inner radius of shaft of cage
+// R2: Inner radius of base ring
+R1 = cage_diameter/2;
+R2 = base_ring_diameter/2;
+
+// r1: cage bar radius
+// r2: base ring radius
+r1 = cage_thick_bar_diameter/2;
+r2 = base_thick_bar_diameter/2;
+
+// P: bend point (assumed to be on the XZ plane)
+// dP: distance from origin to bend point
+P = [bend_point_x, 0, bend_point_z];
+dP = sqrt(sq(P[0]) + sq(P[1]) + sq(P[2]));
+
+// psi: angle from origin to bend point (in degrees)
+psi = atan(P[2]/P[0]);
+
+// dQ: length of straight cage segment
+dQ = dP*cos(90-tilt-psi);
+if (cage_length-glans_cage_height < dQ) {
+  dQ = cage_length-glans_cage_height;
+}
+
+// Q: upper endpoint of straight segment of cage
+Q = [dQ*sin(tilt), 0, dQ*cos(tilt)];
+
+// Phi: arc length of curved segment of cage (in degrees)
+curve_radius = sqrt(sq(P[0]-Q[0]) + sq(P[1]-Q[1]) + sq(P[2]-Q[2]));
+Phi = (cage_length - dQ - glans_cage_height)/curve_radius * 180/PI;
+
+// slit_width: 
+slit_width = (R1+r1)*cos(step);
+
+
+////////////////////////////////////
+//
+// Finally, here's where the modules begin
+//
+$fn=32;
 make();
-
 
 module make() {
   if (flattenBase) {
     difference() {
       union() {
-        make_cage();
+        cage();
         translate([1,0,0]) make_base();
       }
       slicer();
     }
   } else {
     union() {
-      make_cage();
+      cage();
       translate([1,0,0]) make_base();
     }
   }
@@ -99,18 +166,14 @@ module make() {
 
 module make_base() {
   if (separateParts) {
-    translate([-base_ring_diameter-cage_diameter/2, 0, 10+base_thick_bar_diameter]) {
+    translate([-base_ring_diameter-cage_diameter-10, 0, 10+base_thick_bar_diameter]) {
       ring(base_ring_diameter/2, tilt, base_thick_bar_diameter);
     }
   } else {
+    translate([R1*(-1-sin(tilt)), 0, -2])
     ring(base_ring_diameter/2, tilt, base_thick_bar_diameter);
+//    rotate([0, tilt, 0]) mount();
   }
-}
-
-module make_cage() {
-  h=max(0, cage_glans_height-cage_diameter/2);
-  cage(cage_diameter/2, h, 360/cage_bar_count,cage_length, tilt, cage_thick_bar_diameter);
-
 }
 
 // Slice the bottom off the ring and cage to make them more printable
@@ -150,54 +213,43 @@ module rounded_cube(size, radius) {
 	}
 }
 
-module _bent_cylinder_top(zr, phi_max, bendx) {
-  rotate([0, 0, 180]) translate([-bendx, 0, 0]) rotate([90, 0, 0]) {
-    torus(bendx, zr, phi_max);
-  }
-}
-
-module bent_cylinder(zr, phi_max, bend_point) {
-  wiggle=0.001;
-  a=bend_point[2];
-  cylinder(r=zr, h=a);
-  translate([0,0,a-wiggle]) {
-    _bent_cylinder_top(zr, phi_max, bend_point[0]);
-  }
-}
-
-module torus(r, d, phi=360) {
-  if (phi <= 180) {
-    difference() {
-      rotate_extrude(convexity=4) {
-        translate([r,0,0]) circle(d);
+module torus(R, r, phi=360, rounded=false) {
+  if (version_num() > 20151231) {
+    union() {
+      rotate_extrude(convexity=4, angle=phi) {
+        translate([R,0,0]) circle(r);
       }
-      translate([0,-(r+d),0])
-        cube([3*r+3*d,2*(r+d),3*d], center=true);
-      rotate([0, 0, phi - 180])
-        translate([0,-(r+d),0])
-          cube([3*r+3*d,2*(r+d),3*d], center=true);
-    }
-  } else if (phi == 360 ) {
-    rotate_extrude(convexity=4) {
-      translate([r,0,0]) circle(d);
-    }
-  } else if (phi < 360) {
-    rotate([0,0,180])
-    difference() {
-      torus(r,d,360);// full torus
-      torus(r,d,360-phi);//partial torus
+      if (rounded) {
+        translate([R,0,0]) sphere(r);
+        rotate([0,0,phi]) translate([R,0,0]) sphere(r, $fa=60);
+      }
     }
   } else {
-    echo("Not implemented");
+    echo("Using a deprecated method for torus(); consider updating to OpenSCAD 2016 or newer");
+    if (phi <= 180) {
+      difference() {
+        rotate_extrude(convexity=4) {
+          translate([R,0,0]) circle(r);
+        }
+        translate([0,-(R+r),0])
+          cube([3*R+3*r,2*(R+r),3*r], center=true);
+        rotate([0, 0, phi - 180])
+          translate([0,-(R+r),0])
+            cube([3*R+3*r,2*(R+r),3*r], center=true);
+      }
+    } else if (phi <= 360 ) {
+      rotate_extrude(convexity=4) {
+        translate([R,0,0]) circle(r);
+      }
+    } else if (phi < 360) {
+      rotate([0,0,180])
+      difference() {
+        torus(R,r,360);// full torus
+        torus(R,r,360-phi);//partial torus
+      }
+    }
   }
 }
-
-//$fn=60;
-//torus(95, 5);
-//bent_cylinder(3, 45, [100, 0, 20]);
-//_bent_cylinder_top(3, 45, 100);
-
-
 
 module lock_casing_outer() {
   translate([-lock_diameter/2-lock_case_wall, (lock_length+lock_case_wall)/2, lock_case_height+lock_case_wall+lock_diameter/2]) {
@@ -220,6 +272,12 @@ module lock_casing_outer() {
           rounded_hollow_cylinder(lock_diameter/2+lock_case_wall+3.8, lock_diameter/2+wiggle, lock_length+lock_case_wall, lc_rounding);
         }
         translate([4,0,0]) {
+          rounded_hollow_cylinder(lock_diameter/2+lock_case_wall+3.8, lock_diameter/2+wiggle, lock_length+lock_case_wall, lc_rounding);
+        }
+        translate([6,0,0]) {
+          rounded_hollow_cylinder(lock_diameter/2+lock_case_wall+3.8, lock_diameter/2+wiggle, lock_length+lock_case_wall, lc_rounding);
+        }
+        translate([8,0,0]) {
           rounded_hollow_cylinder(lock_diameter/2+lock_case_wall+3.8, lock_diameter/2+wiggle, lock_length+lock_case_wall, lc_rounding);
         }
       }
@@ -259,137 +317,109 @@ module lock_casing() {
   }
 }
 
-//$fn = 60;
-//lock_casing(); 
 
-
-
-module glans_cage_bar(r,h) {
-  union() {
-    translate([0,0,h]) {
-      rotate([90,0,0]) {
-        torus(r+thin_bar, thin_bar, 180);
-      }
-    }
-    translate([r+thin_bar,0,0]) {
-      cylinder(r=thin_bar, h=h);
-    }
-    translate([-r-thin_bar,0,0]) {
-      cylinder(r=thin_bar, h=h);
-    }
-  }
+module cage() {
+  cage_bar_segment();
+  glans_cap();
+  torus(R1+r1, r1*1.2);  // Cage base ring
+//  translate([-R1-r1-2, 0, 0]) rotate([0, tilt, 0]) translate([0, 0, -r1]) mount(); // Shield for the lock
+  translate([R1*(-1-sin(tilt)), 0, -2]) rotate([0, tilt, 0]) mount(); // Shield for the lock
 }
 
-module glans_cage(r,h,step,thick_bar) {
-  union() {
-    torus(r+thick_bar, thick_bar);
-    difference() {
-      for (phi =[90-step/2:step:90+(step/2)]) {
-        rotate([0,0,phi]) glans_cage_bar(r,h);
-      }
-      cylinder(r=(cage_diameter/2+thin_bar)*sin(step/2),h=h+r+2*thick_bar);
-    }
-    difference() {
+module cage_bar_segment() {
+  // Straight segment: N tilted cage bars
+  for (theta = [step/2:step:360-step/2]) {
+    straightseg = dQ - (R1+r1)*cos(theta)*cos(90-tilt);
+    translate([(R1+r1)*cos(theta), (R1+r1)*sin(theta), 0]) rotate([0, tilt, 0]) {
+      // Straight segment
       union() {
-        translate([0,-1*(cage_diameter/2+thin_bar)*sin(step/2), 0]) {
-          rotate([87,0,0]) {
-            torus((cage_diameter/2+thin_bar)*cos(step/2), thin_bar);
-          }
-        }
-        translate([0,(cage_diameter/2+thin_bar)*sin(step/2), 0]) {
-          rotate([93,0,0]) {
-            torus((cage_diameter/2+thin_bar)*cos(step/2), thin_bar);
-          }
-        }
+        cylinder(r=r1, h=straightseg);
+        sphere(r1);
       }
-    translate([0,0,-25]) cube([50,50,50], center=true);
-    }
-//  translate([0,0,h+r+1]) torus(pee_hole+thick_bar, thick_bar);
-  }
-}
-
-module body_bars(r, bend_z, max_phi, step) {
-  for (phi =[step/2:step:360-step/2]) {
-    translate([(r+thin_bar)*cos(phi),(r+thin_bar)*sin(phi),0]) {
-      bent_cylinder(thin_bar, max_phi, [bend_point_x-(r+thin_bar)*cos(phi),0,bend_z]);
-    }
-  }
-}
-
-module cage(r,h,step,length,tilt=0,thick_bar_diameter=4.5) {
-  translate([r+(1+sin(tilt))*thick_bar_diameter,0,thick_bar_diameter/2]) {
-    centered_cage(r,h,step,length,tilt,thick_bar_diameter/2);
-  }
-}
-
-module centered_cage(r,h,step,length,tilt=0,thick_bar) {
-  difference() {
-    translate([-r-sin(tilt)*thick_bar,0,0]) {
-      rotate([0,tilt,0]) {
-        translate([r,0,0]) {
-          cage_body(r,h,step,length, thick_bar);
-        }
+      // Curved segment
+      R_curve = curve_radius - (R1+r1)*cos(theta)*sin(90-tilt);
+      translate([R_curve, 0, straightseg]) rotate([90, 0, 0]) {
+        torus(-R_curve, r1, phi=-Phi, rounded=true);
       }
     }
-    translate([0,0,-2*r]) {
-      cube([4*r,4*r,4*r], center=true);
-    }
   }
-  translate([-r-2*thick_bar-sin(tilt)*thick_bar,0,-thick_bar]) {
-    rotate([0,tilt,0]) {
-      mount(r,mount_height, thick_bar);
-    }
-  }
-  torus(r+thick_bar, thick_bar);
 }
 
-module cage_body(r,h,step,length,thick_bar) {
-  body_length=length-h-r;
-  if (body_length < bend_point_z) {
-    body_bars(r, body_length, 0, step);
-    translate([0,0,body_length]) glans_cage(r,h,step, thick_bar);
-  } else {
-    max_phi=(body_length-bend_point_z)/bend_point_x/3.14159*180;
-    body_bars(r, bend_point_z, max_phi, step);
-    translate([bend_point_x,0,bend_point_z]) {
-      rotate([0,max_phi,0]) {
-        translate([-bend_point_x,0,0]) {
-          glans_cage(r,h,step, thick_bar);
+module glans_cap() {
+  translate(P) rotate([0, Phi, 0]) translate(-P) {
+    translate([dQ*sin(tilt), 0, dQ*cos(tilt)]) {
+      rotate([0, tilt, 0]) {
+        torus(R1+r1,r1); // Base of glans cap
+        // Slit edges
+        translate([0, -slit_width/2, 0]) rotate([85, 0, 0]) {
+          torus((R1+r1)*cos(180/cage_bar_count), r1, phi=180, rounded=true);
+        }
+        translate([0, slit_width/2, 0]) rotate([95, 0, 0]) {
+          torus((R1+r1)*cos(180/cage_bar_count), r1, phi=180, rounded=true);
+        }
+        // Cap side bars
+        for (theta = [90-step/2:step:90+step/2]) {
+          rotate([90, 0, theta]) torus(R1+r1, r1, phi=70, rounded=true);
+          rotate([90, 0, 360-theta]) torus(R1+r1, r1, phi=70, rounded=true);
         }
       }
     }
   }
 }
 
+//////no longer a dovetail////////////
+//////now it's a big slot ////////////
 module dovetail(h, d, w) {
+  
   translate([w-11,0,0]) {
     difference() {
-      rotate([0,0,45]) {
-        translate([-mount_length/2, -mount_length/2, 0]) {
-          rounded_cube([mount_length, mount_length, h-part_distance], 0.5);
+      rotate([0,0,0]) {
+        translate([-mount_length/4, -mount_length/4, 0-part_distance]) {
+          
+          intersection() {
+            rounded_cube([4*mount_length/4, mount_length/2, h], 0.5);
+          
+            translate([-lock_diameter/2-lock_case_wall+17.1, (lock_length+lock_case_wall)/2+5, lock_case_height+lock_case_wall+lock_diameter/2]) rotate([90,90,0]) {
+              union() {
+                rounded_hollow_cylinder(lock_diameter/2+lock_case_wall+3.8, lock_diameter/8+wiggle, lock_length+lock_case_wall, lc_rounding);
+                translate([2,0,0]) {
+                  rounded_hollow_cylinder(lock_diameter/2+lock_case_wall+3.8, lock_diameter/2+wiggle, lock_length+lock_case_wall, lc_rounding);
+                }
+                translate([4,0,0]) {
+                  rounded_hollow_cylinder(lock_diameter/2+lock_case_wall+3.8, lock_diameter/2+wiggle, lock_length+lock_case_wall, lc_rounding);
+                }
+              }
+            }
+          }
         }
       }
       translate([sqrt(2)*mount_length/2-w, -mount_length, -part_distance]) {
         cube([2*mount_length, 2*mount_length, h+part_distance]);
       }
-      translate([sqrt(2)*mount_length/2-2*mount_length-w-d, -mount_length, -part_distance]) {
-        cube([2*mount_length, 2*mount_length, h+part_distance]);
-      }
     }
   }
 }
 
-module mount(r, h, thick_bar) {
-  translate([r+thick_bar+mount_width/2+part_distance,0,thick_bar])
+module mount(r=R1, h=mount_height, thick_bar=r1) {
+  translate([r+thick_bar+mount_width/2+part_distance,0,thick_bar+1])
     mount_halfcircle(r, h, thick_bar);
   translate([-thick_bar+mount_width/2+part_distance, -mount_length/2, 0])
     rounded_cube([mount_width, mount_length, h], 0.5);
-  translate([-thick_bar-mount_width/2+part_distance, 0, part_distance])
+  translate([-thick_bar-mount_width/2+part_distance, 0, part_distance]) {
     difference() {
-        dovetail(h, mount_width, 3.2);
-        translate([thick_bar+mount_width/2,0,-part_distance])
+      dovetail(h, mount_width, 3.2);
+      translate([thick_bar+mount_width/2,0,-part_distance]) {
+        if (lock_margin > 0) {
+          minkowski() {
             lock_casing_inner();
+            cube(lock_margin, center=true);
+          }
+        } else {
+          lock_casing_inner();
+        }
+      }
     }
+  }
 }
 
 module mount_halfcircle(r, h, thick_bar) {
@@ -404,20 +434,7 @@ module mount_halfcircle(r, h, thick_bar) {
   }
 }
 
-//$fn = 60;
-//cage(18, 12, 45, 90, 15);
-//glans_cage_bar(18, 12);
-
-wiggle=0.05;
-part_distance=0.3;
-rounding=1;
-gap=10;
-mount_width=4;
-mount_length=21.505;
-mount_height=18;
-tilt=15;
-
-module base_ring(r, thick_bar) {
+module base_ring(r=R2, thick_bar=r2) {
   a=r+thick_bar;
   c=a/sin(120)*sin(60-asin(sin(120)*r/a));
   if (wavyBase) {
@@ -440,19 +457,19 @@ module wavy_torus(R, r, pitch) {
   union() {
     translate([-sin(-45)*R*(1-cos(pitch)), 0, 1-R*sin(-45)*sin(pitch)]) rotate([0, pitch, 0]) rotate([0, 0, -45]) {
       torus(R, r, 90);
-      translate([R, 0, 0]) sphere(r, center=true);
+      translate([R, 0, 0]) sphere(r);
     }
     translate([0, sin(45)*R*(1-cos(pitch)), 1-R*sin(45)*sin(pitch)]) rotate([pitch, 0, 0]) rotate([0, 0, 45]) {
       torus(R, r, 90);
-      translate([R, 0, 0]) sphere(r, center=true);
+      translate([R, 0, 0]) sphere(r);
     }
     translate([-sin(135)*R*(1-cos(pitch)), 0, 1-R*sin(135)*sin(-pitch)]) rotate([0, -pitch, 0]) rotate([0, 0, 135]) {
       torus(R, r, 90);
-      translate([R, 0, 0]) sphere(r, center=true);
+      translate([R, 0, 0]) sphere(r);
     }
     translate([0, sin(-135)*R*(1-cos(pitch)), 1-R*sin(-135)*sin(-pitch)]) rotate([-pitch, 0, 0]) rotate([0, 0, -135]) {
       torus(R, r, 90);
-      translate([R, 0, 0]) sphere(r, center=true);
+      translate([R, 0, 0]) sphere(r);
     }
   }
 }
@@ -462,13 +479,11 @@ module shield_lock_case(thick_bar) {
   difference() {
     union() {
       translate([-mount_width-part_distance, -mount_length/2, 0]) {
+        translate([0, 0, -13]) {
+          rounded_cube([2*mount_width+part_distance, mount_length, gap+2*thick_bar], rounding);
+        }
         difference() {
           rounded_cube([mount_width, mount_length, mount_height+thick_bar], rounding);
-          translate([-mount_length/3, -0.21*mount_length, -wiggle]) {
-            rotate([0,0,45]) {
-              cube([mount_length, mount_length, mount_height+thick_bar+2*wiggle]);
-            }
-          }
         }
       }
       translate([0, 0, thick_bar]) {
@@ -484,13 +499,23 @@ module shield_lock_case(thick_bar) {
         }
       }
     }
-    translate([0, 0, thick_bar]) lock_casing_inner();
+    translate([0, 0, thick_bar]) {
+      if (lock_margin > 0) {
+        minkowski() {
+          lock_casing_inner();
+          cube(lock_margin, center=true);
+        }
+      } else {
+        lock_casing_inner();
+      }
+    }
+    translate([0, 0, 18]) cube([30, 11, 30], center=true);
   }
 }
 
 module shield(thick_bar) {
   translate([-2*mount_width-part_distance, -mount_length/2, 0]) {
-    rounded_cube([2*mount_width+part_distance, mount_length, gap+2*thick_bar], rounding);
+//    rounded_cube([2*mount_width+part_distance, mount_length, gap+2*thick_bar], rounding);
   }
   translate([-mount_width, 0, gap+thick_bar]) {
     shield_lock_case(thick_bar);
