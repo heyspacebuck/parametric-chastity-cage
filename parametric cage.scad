@@ -18,7 +18,7 @@ base_thick_bar_diameter=6; // [6:10]
 wavyBase = 1; // [0: Flat, 1: Wavy]
 
 // EXPERIMENTAL: If the base ring has a wave, set the angle of the wave
-waveAngle = 20; // [0:45]
+waveAngle = 25; // [0:45]
 
 // Cage diameter
 cage_diameter=40; // [30:40]
