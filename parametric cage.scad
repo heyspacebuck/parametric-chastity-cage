@@ -46,7 +46,10 @@ cage_bar_count=8;
 tilt=15; // [0:30]
 
 // If your lock fits too tightly in the casing, add some space around it here (NOTE: this is computationally taxing, keep it set to 0 until you are really sure you need it)
-lock_margin = 0.5; // [0:0.01:1]
+lock_margin = 0; // [0:0.01:1]
+
+// If the two parts slide too stiffly, add some space here
+part_margin = 0.2; // [0:0.01:1]
 
 // X-axis coordinate of the bend point (the center of the arc the cage bends around)
 bend_point_x=50; // [0:0.1:200]
@@ -509,14 +512,11 @@ module shield_lock_case(thick_bar) {
         lock_casing_inner();
       }
     }
-    translate([0, 0, 18]) cube([30, 11, 30], center=true);
+    translate([0, 0, 18]) cube([30, 11+2*part_margin, 30], center=true);
   }
 }
 
 module shield(thick_bar) {
-  translate([-2*mount_width-part_distance, -mount_length/2, 0]) {
-//    rounded_cube([2*mount_width+part_distance, mount_length, gap+2*thick_bar], rounding);
-  }
   translate([-mount_width, 0, gap+thick_bar]) {
     shield_lock_case(thick_bar);
   }
