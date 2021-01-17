@@ -213,7 +213,7 @@ module cage_bar_segments() {
       vec2 = [curveSegEnd.x, 0, curveSegEnd.z]-P;
       curveAngle = acos(dot(vec1, vec2)/(norm(vec1)*norm(vec2)));
       curveRad = norm(vec1);
-      translate(straightSegEnd) ry(-180+tilt) dx(-curveRad) rx(90) torus(curveRad, r1, -curveAngle);
+      translate(straightSegEnd) ry(-180+tilt) dx(-curveRad) rx(90) torus(curveRad, r1, -curveAngle, rounded=true);
     }
   }
 }
