@@ -130,10 +130,6 @@ psi = atan(P[2]/P[0]);
 
 // dQ: length of straight cage segment
 dQ = min(dP*cos(90-tilt-psi), cage_length-glans_cage_height);
-//dQ = dP*cos(90-tilt-psi);
-//if (cage_length-glans_cage_height < dQ) {
-//  dQ = cage_length-glans_cage_height;
-//}
 
 // Q: upper endpoint of straight segment of cage
 Q = [dQ*sin(tilt), 0, dQ*cos(tilt)];
@@ -141,7 +137,6 @@ Q = [dQ*sin(tilt), 0, dQ*cos(tilt)];
 // Phi: arc length of curved segment of cage (in degrees)
 curve_radius = sqrt(sq(P[0]-Q[0]) + sq(P[1]-Q[1]) + sq(P[2]-Q[2]));
 Phi = (cage_length - dQ - glans_cage_height)/curve_radius * 180/PI;
-echo(dQ);
 
 // slit_width: 
 slit_width = (R1+r1)*cos(step);
@@ -153,8 +148,6 @@ slit_width = (R1+r1)*cos(step);
 //
 $fn=32;
 make();
-
-#translate(P) sphere(1);
 
 module make() {
   cage();
