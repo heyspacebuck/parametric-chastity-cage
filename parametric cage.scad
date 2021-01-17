@@ -24,6 +24,9 @@ use <stealth_lock.scad>
 // Use separate module for torus functions
 use <torus.scad>
 
+// Use separate module for computing points along the cage path
+use <vec3math.scad>
+
 // Render cage and ring separately
 separateParts = 0; // [0: Together, 1: Separate]
 
@@ -123,10 +126,10 @@ lock_lateral = 5.6;
 // P: bend point (assumed to be on the XZ plane)
 // dP: distance from origin to bend point
 P = [bend_point_x, 0, bend_point_z];
-dP = sqrt(sq(P[0]) + sq(P[1]) + sq(P[2]));
+dP = norm(P);
 
 // psi: angle from origin to bend point (in degrees)
-psi = atan(P[2]/P[0]);
+psi = atan(P.z/P.x);
 
 // dQ: length of straight cage segment
 dQ = min(dP*cos(90-tilt-psi), cage_length-glans_cage_height);
@@ -135,7 +138,7 @@ dQ = min(dP*cos(90-tilt-psi), cage_length-glans_cage_height);
 Q = [dQ*sin(tilt), 0, dQ*cos(tilt)];
 
 // Phi: arc length of curved segment of cage (in degrees)
-curve_radius = sqrt(sq(P[0]-Q[0]) + sq(P[1]-Q[1]) + sq(P[2]-Q[2]));
+curve_radius = norm(P-Q);
 Phi = (cage_length - dQ - glans_cage_height)/curve_radius * 180/PI;
 
 // slit_width: 
@@ -192,20 +195,25 @@ module cage() {
 }
 
 module cage_bar_segments() {
-  // Straight segment: N tilted cage bars
   for (theta = [step/2:step:360-step/2]) {
-    straightseg = dQ - (R1+r1)*cos(theta)*cos(90-tilt);
-    translate([(R1+r1)*cos(theta), (R1+r1)*sin(theta), 0]) ry(tilt) {
-      // Straight segment
-      union() {
-        cylinder(r=r1, h=straightseg);
-        sphere(r1);
-      }
-      // Curved segment
-      R_curve = curve_radius - (R1+r1)*cos(theta)*sin(90-tilt);
-      translate([R_curve, 0, straightseg]) ry(180) rx(90) {
-        torus(R_curve, r1, phi=-Phi, rounded=true);
-      }
+    // Straight segment begins at a point along the base ring, and ends at a point a distance R1 from point Q
+    straightSegStart = rz([R1+r1, 0, 0], theta);
+    straightSegEnd = Q + ry(straightSegStart, tilt);
+    curveSegEnd = ry(straightSegEnd-P, Phi)+P;
+    
+    // make a cylinder between straightSegStart and straightSegEnd
+    segAngle = 90-atan2(straightSegEnd.z - straightSegStart.z, straightSegEnd.x - straightSegStart.x);
+    segLength = norm(straightSegEnd - straightSegStart);
+    translate(straightSegStart) ry(segAngle) cylinder(r=r1, h=segLength);
+    
+    // Make a torus between straightSegEnd and curveSegEnd, if necessary
+    if (Phi>0) {
+      // First, find the angle between the ends of the curve
+      vec1 = [straightSegEnd.x, 0, straightSegEnd.z]-P;
+      vec2 = [curveSegEnd.x, 0, curveSegEnd.z]-P;
+      curveAngle = acos(dot(vec1, vec2)/(norm(vec1)*norm(vec2)));
+      curveRad = norm(vec1);
+      translate(straightSegEnd) ry(-180+tilt) dx(-curveRad) rx(90) torus(curveRad, r1, -curveAngle);
     }
   }
 }
