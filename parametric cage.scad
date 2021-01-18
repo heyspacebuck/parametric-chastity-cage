@@ -57,6 +57,9 @@ cage_bar_thickness=4; // [4:8]
 // Number of vertical bars on the cage
 cage_bar_count=8;
 
+// Width of the slit at the front opening
+slit_width=12; // [0:40]
+
 // Tilt angle of the cage at the base ring
 tilt=15; // [0:30]
 
@@ -141,9 +144,10 @@ Q = [dQ*sin(tilt), 0, dQ*cos(tilt)];
 curve_radius = norm(P-Q);
 Phi = (cage_length - dQ - glans_cage_height)/curve_radius * 180/PI;
 
-// slit_width: 
-slit_width = (R1+r1)*cos(step);
+// R: endpoint of curved segment of cage
+R = ry(Q-P, Phi) + P;
 
+//slit_width = (R1+r1)*cos(step);
 
 ////////////////////////////////////
 //
@@ -219,22 +223,29 @@ module cage_bar_segments() {
 }
 
 module glans_cap() {
-  translate(P) ry(Phi) translate(-P) {
-    translate([dQ*sin(tilt), 0, dQ*cos(tilt)]) {
-      ry(tilt) {
-        torus(R1+r1,r1); // Base of glans cap
-        // Slit edges
-        dy(-slit_width/2) rx(85) {
-          torus((R1+r1)*cos(180/cage_bar_count), r1, phi=180, rounded=true);
-        }
-        dy(slit_width/2) rx(95) {
-          torus((R1+r1)*cos(180/cage_bar_count), r1, phi=180, rounded=true);
-        }
-        // Cap side bars
-        for (theta = [90-step/2:step:90+step/2]) {
-          rotate([90, 0, theta]) torus(R1+r1, r1, phi=70, rounded=true);
-          rotate([90, 0, 360-theta]) torus(R1+r1, r1, phi=70, rounded=true);
-        }
+  // First, ensure the slit width is within the bounds of the cage geometry
+  real_slit_width = max(min(slit_width, cage_diameter), 0.1);
+  translate(R) ry(Phi+tilt) {
+    // Ring around base of glans cap
+    torus(R1+r1, r1);
+    // Calculate the start and end points of the bars that create the front slit
+    slitRadius = (R1+r1)*cos(asin(real_slit_width/2/(R1+r1)));
+    slitStart = [slitRadius, -real_slit_width/2, 0];
+    slitEnd = mx(slitStart);
+    
+    // Draw slit bars
+    dy(-real_slit_width/2) rx(90) torus(slitRadius, r1, 180);
+    dy(real_slit_width/2) rx(90) torus(slitRadius, r1, 180);
+    
+    // Draw each cage bar (minus the part that would enter the slit area)
+    for (theta = [step/2:step:180-step/2]) {
+      // Do not calculate/draw the bar if the bar begins within the slit area
+      if ((R1+r1)*sin(theta) > real_slit_width/2) {
+        // Compute arc length of this side bar
+        distanceInSlit = (real_slit_width/2)/sin(theta);
+        arcLength = acos(distanceInSlit/(R1+r1));
+        rz(theta) rx(90) torus(R1+r1, r1, arcLength);
+        rz(180+theta) rx(90) torus(R1+r1, r1, arcLength);
       }
     }
   }
