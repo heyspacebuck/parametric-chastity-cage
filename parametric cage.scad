@@ -28,7 +28,7 @@ use <torus.scad>
 use <vec3math.scad>
 
 // Render cage and ring separately
-separateParts = 0; // [0: Together, 1: Separate]
+separateParts = 1; // [0: Together, 1: Separate]
 
 // Cage diameter
 cage_diameter=35; // [30:40]
@@ -67,7 +67,7 @@ tilt=15; // [0:30]
 lock_margin = 0.1; // [0:0.01:1]
 
 // If the two parts slide too stiffly, add some space here
-part_margin = 0.2; // [0:0.01:1]
+part_margin = 0.4; // [0:0.01:1]
 
 // X-axis coordinate of the bend point (the center of the arc the cage bends around)
 bend_point_x=50; // [0:0.1:200]
@@ -157,8 +157,67 @@ $fn=32;
 make();
 
 module make() {
-  cage();
-  make_base();
+  dx(40) dz(R1+cage_ring_thickness) rx(-90) difference() {
+    cageA();
+    translate(R) ry(Phi+tilt) dx(-R1-r1) {
+      rx(-90) cylinder(r1=r1*.75, r2=r1*.5,h=3);
+    }
+    dx(R1+r1) {
+      rx(-90) cylinder(r1=r1*.75, r2=r1*.5,h=3);
+    }
+  }
+  dx(-40) dz(R1+cage_ring_thickness) rx(-90) difference() {
+    cageB();
+    rz(180) translate(R) ry(Phi+tilt) dx(R1+r1) {
+      rx(90) cylinder(r1=r1*.75, r2=r1*.5,h=3);
+    }
+    rz(180) dx(-R1-r1*1.5) {
+      ry(tilt) {
+        dz(r1) rx(90) cylinder(r1=r1*.75, r2=r1*.5,h=3);
+        dz(r1+10) rx(90) cylinder(r1=r1*.75, r2=r1*.5,h=3);
+      }
+    }
+  }
+  dx(20) dy(-40) make_base();
+}
+
+module cageA() {
+  
+  intersection() {
+    cage();
+    xz();
+  }
+  translate(R) ry(Phi+tilt) dx(R1+r1) {
+    intersection() {
+      rx(90) cylinder(r1=r1*.75, r2=r1*.5,h=3);
+      rx(90) cylinder(h=r1*4, r=r1);
+    }
+  }
+  dx(-R1-r1*1.5) {
+    ry(tilt) {
+      dz(r1) rx(90) cylinder(r1=r1*.75, r2=r1*.5,h=3);
+      dz(r1+10) rx(90) cylinder(r1=r1*.75, r2=r1*.5,h=3);
+    }
+  }
+}
+
+module cageB() {
+  intersection() {
+    rz(180) cage();
+    xz();
+  }
+  rz(180) translate(R) ry(Phi+tilt) dx(-R1-r1) {
+    intersection() {
+      rx(-90) cylinder(r1=r1*.75, r2=r1*.5,h=3);
+      rx(-90) cylinder(h=r1*4, r=r1);
+    }
+  }
+  dx(-R1-r1) {
+    intersection() {
+      rx(90) cylinder(r1=r1*.75, r2=r1*.5,h=3);
+      rx(90) cylinder(r=r1*1.2, h=r1*4);
+    }
+  }
 }
 
 module make_base() {
@@ -263,11 +322,20 @@ module cage_lock() {
 module lock_dovetail_inner() {
   inner_dovetail_length = mount_length/3 - part_margin;
   difference() {
-    lock_case_shape(inner_dovetail_length);
+    union() {
+      intersection() {
+        dy(-9-part_margin) skewyx(-0.4) lock_case_shape(inner_dovetail_length+3.5);
+        xz();
+      }
+      difference() {
+        dy(9+part_margin) skewyx(0.4)  lock_case_shape(inner_dovetail_length+3.5);
+        xz();
+      }
+    }
     // Ensure the lock body does not enter the cage itself
     dz(-r3) skewxz(tan(tilt)) cylinder(r=R1+r3, h=100, center=true);
     // Cut a cavity for the lock module
-    dx(-R1-r3-mount_width/2-lock_lateral) ry(tilt) dz(lock_vertical) dy(19-mount_length/2) {
+    dx(-R1-r3-mount_width/2-lock_lateral) ry(tilt) dz(lock_vertical) dy(18-mount_length/2) {
       stealth_lock(lock_margin);
       rx(-90) cylinder(r=3.1+lock_margin, h=mount_length-19);
     }
@@ -282,14 +350,14 @@ module lock_dovetail_outer() {
         my() dy(mount_length/3) lock_case_shape(mount_length/3, outer=true);
       }
       // Cut a cavity for the lock module
-      sy(1.01) dx(-R1-r3-mount_width/2-lock_lateral) ry(tilt) dz(lock_vertical) dy(19-mount_length/2) {
+      sy(1.01) dx(-R1-r3-mount_width/2-lock_lateral) ry(tilt) dz(lock_vertical) dy(18-mount_length/2) {
         stealth_lock(lock_margin);
-        rx(-90) cylinder(r=3.1+lock_margin, h=mount_length-19);
+        rx(-90) cylinder(r=3.1+lock_margin, h=mount_length-10, center=true);
       }
     }
     union() {
-       dz(-r3) skewxz(tan(tilt)) dz(-r3) mx() dx(R1+r3+mount_width/2 + part_margin) dy(-mount_length/2) rounded_cube([50, mount_length/3, mount_height*cos(tilt)+2*r3], rounding);
-      my() dz(-r3) skewxz(tan(tilt)) dz(-r3) mx() dx(R1+r3+mount_width/2 + part_margin) dy(-mount_length/2) rounded_cube([50, mount_length/3, mount_height*cos(tilt)+2*r3], rounding);
+       dy(7.3) dz(-r3) skewyx(.4) skewxz(tan(tilt)) dz(-r3) mx() dx(R1+r3+mount_width/2 + part_margin) dy(-mount_length/2 - part_margin) rounded_cube([50, mount_length/3, mount_height*cos(tilt)+2*r3], rounding);
+      my() dy(7.3) dz(-r3) skewyx(.4)  skewxz(tan(tilt)) dz(-r3) mx() dx(R1+r3+mount_width/2 + part_margin) dy(-mount_length/2 - part_margin) rounded_cube([50, mount_length/3, mount_height*cos(tilt)+2*r3], rounding);
     }
   }
   // Add a connecting block between the lock part and the base ring:
