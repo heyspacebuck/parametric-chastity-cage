@@ -75,6 +75,12 @@ bend_point_x=50; // [0:0.1:200]
 // Z-axis coordinate of the bend point (the center of the arc the cage bends around)
 bend_point_z=15; // [0:0.1:200]
 
+// Diameter of the hole that accepts a peg for part mating; default set for using 1.75mm filament (mm)
+peg_diameter = 2; // [0:.01:4]
+
+// Length of the peg for part mating (mm)
+peg_length = 10; // [2:.1:10]
+
 /* [Hidden] */
 
 // Glans cage height (minimum is cage radius)
@@ -160,21 +166,21 @@ module make() {
   dx(40) dz(R1+cage_ring_thickness) rx(-90) difference() {
     cageA();
     translate(R) ry(Phi+tilt) dx(-R1-r1) {
-      rx(-90) cylinder(r1=r1*.75, r2=r1*.5,h=3);
+      peg_hole();
     }
     dx(R1+r1) {
-      rx(-90) cylinder(r1=r1*.75, r2=r1*.5,h=3);
+      peg_hole();
     }
   }
   dx(-40) dz(R1+cage_ring_thickness) rx(-90) difference() {
     cageB();
     rz(180) translate(R) ry(Phi+tilt) dx(R1+r1) {
-      rx(90) cylinder(r1=r1*.75, r2=r1*.5,h=3);
+      peg_hole();
     }
     rz(180) dx(-R1-r1*1.5) {
       ry(tilt) {
-        dz(r1) rx(90) cylinder(r1=r1*.75, r2=r1*.5,h=3);
-        dz(r1+10) rx(90) cylinder(r1=r1*.75, r2=r1*.5,h=3);
+        dz(r1) peg_hole();
+        dz(r1+10) peg_hole();
       }
     }
   }
@@ -183,39 +189,30 @@ module make() {
 
 module cageA() {
   
-  intersection() {
+  difference() {
     cage();
-    xz();
-  }
-  translate(R) ry(Phi+tilt) dx(R1+r1) {
-    intersection() {
-      rx(90) cylinder(r1=r1*.75, r2=r1*.5,h=3);
-      rx(90) cylinder(h=r1*4, r=r1);
+    my() xz();
+    translate(R) ry(Phi+tilt) dx(R1+r1) {
+      peg_hole();
     }
-  }
-  dx(-R1-r1*1.5) {
-    ry(tilt) {
-      dz(r1) rx(90) cylinder(r1=r1*.75, r2=r1*.5,h=3);
-      dz(r1+10) rx(90) cylinder(r1=r1*.75, r2=r1*.5,h=3);
+    dx(-R1-r1*1.5) {
+      ry(tilt) {
+        dz(r1) peg_hole();
+        dz(r1+10) peg_hole();
+      }
     }
   }
 }
 
 module cageB() {
-  intersection() {
+  difference() {
     rz(180) cage();
-    xz();
-  }
-  rz(180) translate(R) ry(Phi+tilt) dx(-R1-r1) {
-    intersection() {
-      rx(-90) cylinder(r1=r1*.75, r2=r1*.5,h=3);
-      rx(-90) cylinder(h=r1*4, r=r1);
+    my() xz();
+    rz(180) translate(R) ry(Phi+tilt) dx(-R1-r1) {
+      peg_hole();
     }
-  }
-  dx(-R1-r1) {
-    intersection() {
-      rx(90) cylinder(r1=r1*.75, r2=r1*.5,h=3);
-      rx(90) cylinder(r=r1*1.2, h=r1*4);
+    dx(-R1-r1) {
+      peg_hole();
     }
   }
 }
@@ -255,6 +252,10 @@ module cage() {
   glans_cap(); // The cap
   torus(R1+r1, r3);  // Cage base ring
   cage_lock(); // The part where the lock goes
+}
+
+module peg_hole() {
+  rx(90) cylinder(d=peg_diameter, h=peg_length, center=true);
 }
 
 module cage_bar_segments() {
