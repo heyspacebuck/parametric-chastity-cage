@@ -173,7 +173,7 @@ module make_base() {
 module rounded_cylinder(r,h,n, center=false) {
   zshift = center ? -h/2 : 0;
   dz(zshift) rotate_extrude(convexity=1) {
-    offset(r=n) offset(delta=-n) square([r,h]);
+    offset(r=n - 0.0001) offset(delta=-n) square([r,h]);
     square([n,h]);
   }
 }
